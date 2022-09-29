@@ -1,0 +1,15 @@
+[
+  {
+    "type": 1,
+    "name": "2048",
+    "description": "Starts a game of 2048",
+    "options": [
+      {
+        "type": 5,
+        "name": "ephemeral",
+        "description": "Should the game only be visible to yoursel? [default: true]",
+        "required": false
+      }
+    ]
+  }
+]
