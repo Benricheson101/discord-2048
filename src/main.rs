@@ -231,6 +231,25 @@ fn handle_button(
     i: &Interaction,
     data: &MessageComponentInteractionData,
 ) -> InteractionResponse {
+    // there will always be a message and interaction present
+    let msg = i.message.as_ref().unwrap();
+    let int = msg.interaction.as_ref().unwrap();
+
+    if i.author_id().unwrap() != int.user.id {
+        let resp = InteractionResponse {
+            kind: InteractionResponseType::ChannelMessageWithSource,
+            data: Some(InteractionResponseData {
+                content: Some(
+                    "Not your game! Start one by running </2048:1025179697883119676>".to_string(),
+                ),
+                flags: Some(MessageFlags::EPHEMERAL),
+                ..Default::default()
+            }),
+        };
+
+        return resp;
+    }
+
     let mut game = {
         let msg = i.message.as_ref().unwrap();
 
@@ -281,25 +300,6 @@ fn handle_button(
         }
         a
     };
-
-    // there will always be a message and interaction present
-    let msg = i.message.as_ref().unwrap();
-    let int = msg.interaction.as_ref().unwrap();
-
-    if i.author_id().unwrap() != int.user.id {
-        let resp = InteractionResponse {
-            kind: InteractionResponseType::ChannelMessageWithSource,
-            data: Some(InteractionResponseData {
-                content: Some(
-                    "Not your game! Start one by running `/2048`".to_string(),
-                ),
-                flags: Some(MessageFlags::EPHEMERAL),
-                ..Default::default()
-            }),
-        };
-
-        return resp;
-    }
 
     match data.custom_id.as_str() {
         "up" => game.r#move(MoveDirection::Up),
@@ -378,27 +378,29 @@ fn game_board_to_msg_components(board: &GameBoard) -> Vec<Component> {
         })
         .collect::<Vec<_>>();
 
-    let controls = Component::ActionRow(ActionRow {
-        components: {
-            [["left", "⬅️"], ["up", "⬆️"], ["down", "⬇️"], ["right", "➡️"]]
-                .iter()
-                .map(|c| {
-                    Component::Button(Button {
-                        custom_id: Some(c[0].to_string()),
-                        disabled: board.has_lost(),
-                        emoji: Some(ReactionType::Unicode {
-                            name: c[1].to_string(),
-                        }),
-                        label: None,
-                        style: ButtonStyle::Success,
-                        url: None,
+    if !board.has_lost() {
+        let controls = Component::ActionRow(ActionRow {
+            components: {
+                [["left", "⬅️"], ["up", "⬆️"], ["down", "⬇️"], ["right", "➡️"]]
+                    .iter()
+                    .map(|c| {
+                        Component::Button(Button {
+                            custom_id: Some(c[0].to_string()),
+                            disabled: false,
+                            emoji: Some(ReactionType::Unicode {
+                                name: c[1].to_string(),
+                            }),
+                            label: None,
+                            style: ButtonStyle::Success,
+                            url: None,
+                        })
                     })
-                })
-                .collect::<Vec<_>>()
-        },
-    });
+                    .collect::<Vec<_>>()
+            },
+        });
 
-    rows.push(controls);
+        rows.push(controls);
+    }
 
     rows
 }
