@@ -11,5 +11,10 @@
         "required": false
       }
     ]
+  },
+  {
+    "type": 1,
+    "name": "invite",
+    "description": "Get a link to invite the bot"
   }
 ]

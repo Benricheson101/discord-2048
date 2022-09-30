@@ -208,6 +208,19 @@ async fn handle_command(
             return Ok(resp);
         },
 
+        "invite" => {
+            return Ok(InteractionResponse {
+                kind: InteractionResponseType::ChannelMessageWithSource,
+                data: Some(InteractionResponseData {
+                    content: Some(
+                        "https://discord.com/api/oauth2/authorize?client_id=1025178745578991696&scope=applications.commands".into(),
+                    ),
+                    flags: Some(MessageFlags::EPHEMERAL),
+                    ..Default::default()
+                }),
+            });
+        },
+
         _ => {
             unreachable!()
         },
