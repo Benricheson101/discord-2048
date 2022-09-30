@@ -3,6 +3,9 @@ name: 'Publish Docker image'
 on:
   push:
     branches: ['main']
+    paths:
+      - '**/*.rs'
+      - '**/*.toml'
 
 jobs:
   push_to_registries:
