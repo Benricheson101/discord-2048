@@ -36,7 +36,7 @@ use twilight_model::{
             InteractionType,
         },
     },
-    channel::{message::MessageFlags, ReactionType},
+    channel::{message::MessageFlags, Message, ReactionType},
     http::interaction::{
         InteractionResponse,
         InteractionResponseData,
@@ -44,7 +44,7 @@ use twilight_model::{
     },
 };
 
-const ZWS: &str = "​";
+const ZWS: &str = "\u{200B}";
 
 static PUB_KEY: Lazy<PublicKey> = Lazy::new(|| {
     let pk = env::var("DISCORD_PUBLIC_KEY")
@@ -250,58 +250,10 @@ fn handle_button(
         return resp;
     }
 
-    let mut game = {
-        let msg = i.message.as_ref().unwrap();
-
-        let component_labels = msg.components[0..4]
-            .iter()
-            .map(|c| match c {
-                Component::ActionRow(ar) => ar
-                    .components
-                    .iter()
-                    .map(|c2| match &c2 {
-                        Component::Button(b) => {
-                            match b.label.as_ref().unwrap().as_str() {
-                                ZWS => BoardSpace::Vacant,
-                                t @ _ => {
-                                    let num = t.parse::<usize>().unwrap();
-                                    BoardSpace::Tile(num)
-                                },
-                            }
-                        },
-                        _ => unreachable!(),
-                    })
-                    .collect::<Vec<_>>(),
-                _ => unreachable!(),
-            })
-            .collect::<Vec<_>>();
-
-        let score = {
-            const SCORE_PREFIX: &str = "**Score:** ";
-            if let Some(start) = msg.content.find(SCORE_PREFIX) {
-                let after = &msg.content[(start + SCORE_PREFIX.len())..]
-                    .trim()
-                    .parse::<usize>()
-                    .unwrap_or(0);
-                *after
-            } else {
-                0
-            }
-        };
-
-        let mut a = GameBoard::empty();
-        a.score = score;
-
-        // TODO: is there a better way to turn Vec<Vec<T>> into [[T;4];4]
-        for y in 0..GAME_BOARD_SIZE {
-            for x in 0..GAME_BOARD_SIZE {
-                a.cells[y][x] = component_labels[y][x];
-            }
-        }
-        a
-    };
+    let mut game = msg_to_game_board(i.message.as_ref().unwrap());
 
     match data.custom_id.as_str() {
+        "reset" => game = GameBoard::new(),
         "up" => game.r#move(MoveDirection::Up),
         "down" => game.r#move(MoveDirection::Down),
         "left" => game.r#move(MoveDirection::Left),
@@ -335,6 +287,8 @@ fn handle_button(
 }
 
 fn game_board_to_msg_components(board: &GameBoard) -> Vec<Component> {
+    let has_lost = board.has_lost();
+
     let mut rows = board
         .cells
         .iter()
@@ -350,16 +304,14 @@ fn game_board_to_msg_components(board: &GameBoard) -> Vec<Component> {
                             Component::Button(Button {
                                 url: None,
                                 emoji: None,
-                                disabled: is_vacant,
+                                disabled: is_vacant || has_lost,
                                 custom_id: Some(format!("{x}-{y}")),
-                                style: match cell {
-                                    &BoardSpace::Tile(t) if t >= 2048 => {
+                                style: match *cell {
+                                    BoardSpace::Tile(t) if t >= 2048 => {
                                         ButtonStyle::Success
                                     },
-                                    &BoardSpace::Tile(_) => {
-                                        ButtonStyle::Primary
-                                    },
-                                    &BoardSpace::Vacant => {
+                                    BoardSpace::Tile(_) => ButtonStyle::Primary,
+                                    BoardSpace::Vacant => {
                                         ButtonStyle::Secondary
                                     },
                                 },
@@ -378,7 +330,22 @@ fn game_board_to_msg_components(board: &GameBoard) -> Vec<Component> {
         })
         .collect::<Vec<_>>();
 
-    if !board.has_lost() {
+    if has_lost {
+        let controls = Component::ActionRow(ActionRow {
+            components: vec![Component::Button(Button {
+                custom_id: Some("reset".into()),
+                label: Some("Play Again?".into()),
+                emoji: Some(ReactionType::Unicode {
+                    name: "🔁".into()
+                }),
+                style: ButtonStyle::Secondary,
+                disabled: false,
+                url: None,
+            })],
+        });
+
+        rows.push(controls);
+    } else {
         let controls = Component::ActionRow(ActionRow {
             components: {
                 [["left", "⬅️"], ["up", "⬆️"], ["down", "⬇️"], ["right", "➡️"]]
@@ -403,4 +370,53 @@ fn game_board_to_msg_components(board: &GameBoard) -> Vec<Component> {
     }
 
     rows
+}
+
+fn msg_to_game_board(msg: &Message) -> GameBoard {
+    let component_labels = msg.components[0..4]
+        .iter()
+        .map(|c| match c {
+            Component::ActionRow(ar) => ar
+                .components
+                .iter()
+                .map(|c2| match &c2 {
+                    Component::Button(b) => {
+                        match b.label.as_ref().unwrap().as_str() {
+                            ZWS => BoardSpace::Vacant,
+                            t => {
+                                let num = t.parse::<usize>().unwrap();
+                                BoardSpace::Tile(num)
+                            },
+                        }
+                    },
+                    _ => unreachable!(),
+                })
+                .collect::<Vec<_>>(),
+            _ => unreachable!(),
+        })
+        .collect::<Vec<_>>();
+
+    let score = {
+        const SCORE_PREFIX: &str = "**Score:** ";
+        if let Some(start) = msg.content.find(SCORE_PREFIX) {
+            let after = &msg.content[(start + SCORE_PREFIX.len())..]
+                .trim()
+                .parse::<usize>()
+                .unwrap_or(0);
+            *after
+        } else {
+            0
+        }
+    };
+
+    let mut a = GameBoard::empty();
+    a.score = score;
+
+    // TODO: is there a better way to turn Vec<Vec<T>> into [[T;4];4]
+    for y in 0..GAME_BOARD_SIZE {
+        for x in 0..GAME_BOARD_SIZE {
+            a.cells[y][x] = component_labels[y][x];
+        }
+    }
+    a
 }
