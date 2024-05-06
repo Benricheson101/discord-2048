@@ -3,6 +3,7 @@
     "type": 1,
     "name": "2048",
     "description": "Starts a game of 2048",
+    "integration_types": [0, 1],
     "options": [
       {
         "type": 5,
@@ -15,6 +16,7 @@
   {
     "type": 1,
     "name": "invite",
-    "description": "Get a link to invite the bot"
+    "description": "Get a link to invite the bot",
+    "integration_types": [0, 1]
   }
 ]
