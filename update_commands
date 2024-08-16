@@ -1,0 +1,5 @@
+#!/usr/bin/env bash
+
+. ./.env
+
+AUTH_HEADER="Bearer $(discord-tools client-credentials --scope=applications.commands.update | jq -r .access_token)" curlbot /applications/1025178745578991696/commands -X PUT -d@cmds.json -H 'content-type: application/json' | jq
